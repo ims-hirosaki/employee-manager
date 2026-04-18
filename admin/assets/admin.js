@@ -44,6 +44,28 @@
                 });
             });
         }
+        // 統計カード：フィルター非依存の全体集計をロードして描画
+        function loadStats() {
+            empAjax('emp_get_stats', { nonce: empData.employeeNonce }, function (res) {
+                if (!res.success) return;
+                const d = res.data;
+                $('#statActiveTotal').html(d.active_total + '<span class="emp-stat-unit">名</span>')
+
+                const $row = $('#empAffilStatsRow').empty();
+                if (!d.affiliations.length) {
+                    $row.append('<div class="emp-affil-stats-placeholder">所属データがありません</div>');
+                    return;
+                }
+                d.affiliations.forEach(function (a) {
+                    $row.append(
+                        '<div class="emp-stat-card emp-stat-card--affil">' +
+                        '<div class="emp-stat-label">' + escHtml(a.name) + '</div>' +
+                        '<div class="emp-stat-value emp-stat-affil-count">' + a.active_count + '<span class="emp-stat-unit">名</span></div>' +
+                        '</div>'
+                    );
+                });
+            });
+        }
 
         function loadList() {
             const params = {
@@ -67,9 +89,6 @@
             const { items, total } = data;
             const $tbody = $('#empTbody');
             $tbody.empty();
-
-            // 統計更新は別途取得でも可（ここでは暫定）
-            $('#statTotal').text(total);
 
             if (!items.length) {
                 $tbody.append('<tr><td colspan="10" class="emp-empty">該当する社員が見つかりません</td></tr>');
@@ -116,15 +135,6 @@
             });
 
             renderPagination(total);
-            updateStats(items);
-        }
-
-        function updateStats(items) {
-            // 全体の統計は実際にはAJAXで取得推奨、ここでは現ページデータで暫定表示
-            const active = items.filter(e => parseInt(e.is_active, 10) === 1).length;
-            const retired = items.filter(e => parseInt(e.is_active, 10) === 0).length;
-            $('#statActive').text(active);
-            $('#statRetired').text(retired);
         }
 
         function renderPagination(total) {
@@ -157,6 +167,7 @@
                         .find('.emp-active-dot').end()
                         .html('<span class="emp-active-dot"></span>' + (newVal ? '在籍中' : '退職'));
                     showToast(res.data.message, 'success');
+                    loadStats();
                     loadList();
                 } else {
                     showToast(res.data.message, 'error');
@@ -252,6 +263,7 @@
 
         // 初期化
         loadFilterOptions();
+        loadStats();  // ← 追加
         loadList();
     }
 

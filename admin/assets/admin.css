@@ -153,6 +153,32 @@ a.emp-btn-success:hover {
   box-shadow: var(--emp-shadow);
 }
 
+/* 所属別在籍カード行 */
+.emp-affil-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  /* 所属が増えても自動折り返し */
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.emp-affil-stats-row .emp-stat-card--affil {
+  flex: 0 0 auto;
+  min-width: 130px;
+}
+
+.emp-stat-affil-count {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #0073aa;
+}
+
+.emp-affil-stats-placeholder {
+  color: #9ba3b4;
+  font-size: 0.875rem;
+  padding: 8px 0;
+}
+
 .emp-stat-label {
   font-size: .72rem;
   font-weight: 700;
@@ -166,7 +192,14 @@ a.emp-btn-success:hover {
   font-weight: 700;
   line-height: 1.1;
   margin-top: .2rem;
-  color: var(--emp-text);
+  color: #1e8a4a;
+}
+
+.emp-stat-unit {
+  font-size: 0.55em;
+  font-weight: 400;
+  margin-left: 2px;
+  color: #666;
 }
 
 .emp-stat-active .emp-stat-value {

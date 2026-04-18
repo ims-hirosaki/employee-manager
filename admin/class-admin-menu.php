@@ -154,6 +154,8 @@ class EMP_Admin_Menu {
         // ---- CSVインポート ----
         add_action( 'wp_ajax_emp_csv_template_download', array( 'EMP_CSV_Import', 'download_template' ) );
         add_action( 'wp_ajax_emp_csv_import',            array( 'EMP_CSV_Import', 'ajax_import' ) );
+
+        add_action( 'wp_ajax_emp_get_stats', array( 'EMP_Employee', 'ajax_get_stats' ) );
     }
 
     // =====================================================

@@ -490,6 +490,8 @@ class EMP_Employee {
         wp_send_json_success( self::get_list( $args ) );
     }
 
+
+
     public static function ajax_get_one() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
@@ -532,4 +534,66 @@ class EMP_Employee {
             wp_send_json_error( array( 'message' => '更新に失敗しました' ) );
         }
     }
+
+    /**
+ * 統計情報を返す（フィルター無関係の全体集計）
+ * 所属別在籍人数を含む
+ */
+public static function ajax_get_stats() {
+    check_ajax_referer( 'emp_employee_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+
+    global $wpdb;
+
+    // 総社員数（在籍・退職含む全員）
+    $total = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}emp_master"
+    );
+
+    // 在籍中の合計
+    $active_total = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}emp_master WHERE is_active = 1"
+    );
+
+    // 所属別在籍人数（有効な所属マスタに LEFT JOIN）
+    $rows = $wpdb->get_results(
+        "SELECT a.id, a.name, COUNT(m.id) AS active_count
+         FROM {$wpdb->prefix}mst_affiliation a
+         LEFT JOIN {$wpdb->prefix}emp_master m
+             ON m.affiliation_id = a.id AND m.is_active = 1
+         WHERE a.is_active = 1
+         GROUP BY a.id, a.name
+         ORDER BY a.id ASC"
+    );
+
+    // 所属未設定の在籍者（affiliation_id が NULL または 0）
+    $no_affil = (int) $wpdb->get_var(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}emp_master
+         WHERE is_active = 1
+           AND (affiliation_id IS NULL OR affiliation_id = 0)"
+    );
+
+    $affiliations = array();
+    foreach ( $rows as $row ) {
+        $affiliations[] = array(
+            'id'           => (int) $row->id,
+            'name'         => $row->name,
+            'active_count' => (int) $row->active_count,
+        );
+    }
+    if ( $no_affil > 0 ) {
+        $affiliations[] = array(
+            'id'           => 0,
+            'name'         => '未所属',
+            'active_count' => $no_affil,
+        );
+    }
+
+    wp_send_json_success( array(
+        'total'        => $total,
+        'active_total' => $active_total,
+        'affiliations' => $affiliations,
+    ) );
+}
+
 }

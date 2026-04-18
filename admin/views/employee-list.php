@@ -15,20 +15,18 @@ if ( ! empty( $_GET['emp_saved'] ) ) {
     <?php echo $notice; // phpcs:ignore ?>
 
     <!-- 統計カード -->
-    <div class="emp-stats-row" id="empStatsRow">
-        <div class="emp-stat-card">
-            <div class="emp-stat-label">総社員数</div>
-            <div class="emp-stat-value" id="statTotal">—</div>
-        </div>
-        <div class="emp-stat-card emp-stat-active">
-            <div class="emp-stat-label">在籍中</div>
-            <div class="emp-stat-value" id="statActive">—</div>
-        </div>
-        <div class="emp-stat-card emp-stat-retired">
-            <div class="emp-stat-label">退職</div>
-            <div class="emp-stat-value" id="statRetired">—</div>
-        </div>
+<div class="emp-stats-row" id="empStatsRow">
+    <div class="emp-stat-card emp-stat-active">
+        <div class="emp-stat-label">総社員数</div>
+        <div class="emp-stat-value" id="statActiveTotal">—</div>
     </div>
+</div>
+
+<!-- 統計カード：所属別在籍人数（JS で動的生成） -->
+<div class="emp-affil-stats-row" id="empAffilStatsRow">
+    <!-- 読み込み中プレースホルダー -->
+    <div class="emp-affil-stats-placeholder">読み込み中...</div>
+</div>
 
     <!-- 検索・フィルタツールバー -->
     <div class="emp-toolbar">
