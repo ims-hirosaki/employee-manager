@@ -215,9 +215,36 @@ class EMP_CSV_Export {
             $sql = $wpdb->prepare( $sql, ...$params ); // phpcs:ignore
         }
 
+        self::debug_log(
+            'DB query started',
+            array(
+                'column_keys'     => array_column( $ordered_defs, 'key' ),
+                'is_active'       => $args['is_active'],
+                'affiliation_id'  => $args['affiliation_id'],
+                'department_id'   => $args['department_id'],
+                'hire_date_from'  => $args['hire_date_from'],
+                'hire_date_to'    => $args['hire_date_to'],
+                'need_insurance'  => $need_insurance,
+                'sql'             => self::normalize_sql_for_log( $sql ),
+            )
+        );
+
         $rows = $wpdb->get_results( $sql ); // phpcs:ignore
+        self::debug_log(
+            'DB query completed',
+            array(
+                'row_count'  => is_array( $rows ) ? count( $rows ) : null,
+                'last_error' => $wpdb->last_error,
+            )
+        );
+
         if ( $rows === null ) {
             self::abort_export( '社員情報の取得に失敗しました。' );
+        }
+        if ( empty( $rows ) ) {
+            self::abort_export(
+                '指定された条件に一致する社員がありません。絞り込み条件を確認してください。'
+            );
         }
 
         return $rows;
@@ -300,11 +327,41 @@ class EMP_CSV_Export {
      * CSVレスポンスを開始する前にエラーとして終了する。
      */
     private static function abort_export( $message ) {
+        self::debug_log(
+            'Export aborted',
+            array( 'message' => $message )
+        );
+
         wp_die(
             esc_html( $message ),
             'CSV出力エラー',
             array( 'response' => 400 )
         );
+    }
+
+    /**
+     * WP_DEBUG有効時のみ、個人データを含まない診断情報をログへ出力する。
+     */
+    private static function debug_log( $event, $context = array() ) {
+        if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+            return;
+        }
+
+        $payload = wp_json_encode(
+            $context,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+
+        error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            '[EMP_CSV_Export] ' . $event . ( $payload ? ' ' . $payload : '' )
+        );
+    }
+
+    /**
+     * SQLを1行へ整形し、デバッグログを読みやすくする。
+     */
+    private static function normalize_sql_for_log( $sql ) {
+        return trim( preg_replace( '/\s+/', ' ', $sql ) );
     }
 
     // =====================================================
