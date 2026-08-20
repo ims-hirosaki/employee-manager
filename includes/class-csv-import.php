@@ -86,7 +86,7 @@ class EMP_CSV_Import {
 
     public static function download_template() {
         check_ajax_referer( 'emp_import_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Permission denied' );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( 'Permission denied' );
 
         $type = isset( $_GET['csv_type'] ) ? sanitize_text_field( $_GET['csv_type'] ) : 'basic';
         switch ( $type ) {
@@ -148,7 +148,7 @@ class EMP_CSV_Import {
 
     public static function ajax_import() {
         check_ajax_referer( 'emp_import_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) {
             wp_send_json_error( array( 'message' => '権限がありません' ) );
         }
 

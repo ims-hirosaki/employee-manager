@@ -474,7 +474,7 @@ class EMP_Employee {
 
     public static function ajax_get_list() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
 
         $args = array(
             'search'         => sanitize_text_field( $_POST['search']         ?? '' ),
@@ -494,7 +494,7 @@ class EMP_Employee {
 
     public static function ajax_get_one() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
 
         $id  = (int) ( $_POST['id'] ?? 0 );
         $emp = self::get_by_id( $id );
@@ -507,7 +507,7 @@ class EMP_Employee {
 
     public static function ajax_save() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $id     = (int) ( $_POST['id'] ?? 0 );
         $data   = wp_unslash( $_POST['data'] ?? array() ); // magic quotes対策
@@ -522,7 +522,7 @@ class EMP_Employee {
 
     public static function ajax_toggle_active() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $id     = (int) ( $_POST['id']        ?? 0 );
         $active = (int) ( $_POST['is_active'] ?? 1 );
@@ -541,7 +541,7 @@ class EMP_Employee {
  */
 public static function ajax_get_stats() {
     check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-    if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+    if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
 
     global $wpdb;
 
