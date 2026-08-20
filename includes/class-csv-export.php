@@ -436,7 +436,7 @@ class EMP_CSV_Export {
 
     public static function ajax_export() {
         check_ajax_referer( 'emp_csv_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
 
         $is_active = sanitize_text_field( wp_unslash( $_POST['is_active'] ?? '' ) );
         if ( ! in_array( $is_active, array( '', '0', '1' ), true ) ) {
@@ -496,13 +496,13 @@ class EMP_CSV_Export {
 
     public static function ajax_get_templates() {
         check_ajax_referer( 'emp_csv_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
         wp_send_json_success( self::get_templates() );
     }
 
     public static function ajax_save_template() {
         check_ajax_referer( 'emp_csv_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $name        = sanitize_text_field( $_POST['name']        ?? '' );
         $column_keys = array_map( 'sanitize_key', (array) ( $_POST['column_keys'] ?? array() ) );
@@ -520,7 +520,7 @@ class EMP_CSV_Export {
 
     public static function ajax_update_template() {
         check_ajax_referer( 'emp_csv_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $id   = (int) ( $_POST['id']   ?? 0 );
         $name = sanitize_text_field( $_POST['name'] ?? '' );
@@ -533,7 +533,7 @@ class EMP_CSV_Export {
 
     public static function ajax_delete_template() {
         check_ajax_referer( 'emp_csv_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $id = (int) ( $_POST['id'] ?? 0 );
         if ( self::delete_template( $id ) ) {

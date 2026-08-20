@@ -213,7 +213,7 @@ class EMP_Master {
      */
     public static function ajax_get_list() {
         check_ajax_referer( 'emp_master_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'access_custom_plugins' ) ) wp_die( -1 );
 
         $type = sanitize_key( $_POST['master_type'] ?? '' );
         $data = self::get_all( $type );
@@ -225,7 +225,7 @@ class EMP_Master {
      */
     public static function ajax_insert() {
         check_ajax_referer( 'emp_master_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $type   = sanitize_key( $_POST['master_type'] ?? '' );
         $name   = sanitize_text_field( $_POST['name'] ?? '' );
@@ -252,7 +252,7 @@ class EMP_Master {
      */
     public static function ajax_update() {
         check_ajax_referer( 'emp_master_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $type = sanitize_key( $_POST['master_type'] ?? '' );
         $id   = (int) ( $_POST['id'] ?? 0 );
@@ -275,7 +275,7 @@ class EMP_Master {
      */
     public static function ajax_delete() {
         check_ajax_referer( 'emp_master_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die( -1 );
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
 
         $type   = sanitize_key( $_POST['master_type'] ?? '' );
         $id     = (int) ( $_POST['id'] ?? 0 );
