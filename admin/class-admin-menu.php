@@ -24,7 +24,7 @@ class EMP_Admin_Menu {
         add_menu_page(
             '社員情報管理',
             '社員情報管理',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager',
             array( $this, 'page_employee_list' ),
             'dashicons-groups',
@@ -36,7 +36,7 @@ class EMP_Admin_Menu {
             'employee-manager',
             '社員一覧',
             '社員一覧',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager',
             array( $this, 'page_employee_list' )
         );
@@ -46,7 +46,7 @@ class EMP_Admin_Menu {
             'employee-manager',
             '新規社員登録',
             '新規社員登録',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager-new',
             array( $this, 'page_employee_form' )
         );
@@ -56,7 +56,7 @@ class EMP_Admin_Menu {
             'employee-manager',
             'マスタ管理',
             'マスタ管理',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager-master',
             array( $this, 'page_master' )
         );
@@ -66,7 +66,7 @@ class EMP_Admin_Menu {
             'employee-manager',
             'CSV出力',
             'CSV出力',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager-csv',
             array( $this, 'page_csv' )
         );
@@ -76,7 +76,7 @@ class EMP_Admin_Menu {
             'employee-manager',
             'CSVインポート',
             'CSVインポート',
-            'manage_options',
+            'access_custom_plugins',
             'employee-manager-import',
             array( $this, 'page_import' )
         );
@@ -163,22 +163,33 @@ class EMP_Admin_Menu {
     // =====================================================
 
     public function page_employee_list() {
+        $this->require_access();
         require_once EMP_PLUGIN_DIR . 'admin/views/employee-list.php';
     }
 
     public function page_employee_form() {
+        $this->require_access();
         require_once EMP_PLUGIN_DIR . 'admin/views/employee-form.php';
     }
 
     public function page_master() {
+        $this->require_access();
         require_once EMP_PLUGIN_DIR . 'admin/views/master.php';
     }
 
     public function page_csv() {
+        $this->require_access();
         require_once EMP_PLUGIN_DIR . 'admin/views/csv.php';
     }
 
     public function page_import() {
+        $this->require_access();
         require_once EMP_PLUGIN_DIR . 'admin/views/employee-import.php';
+    }
+
+    private function require_access() {
+        if ( ! current_user_can( 'access_custom_plugins' ) ) {
+            wp_die( '権限がありません。', '', array( 'response' => 403 ) );
+        }
     }
 }
