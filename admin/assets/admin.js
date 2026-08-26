@@ -280,6 +280,7 @@
         const existingData = $('#emp-form-page').data('emp-json');
         if (existingData) {
             fillForm(existingData);
+            renderCrewCodeHistory(existingData.crew_code_history || []);
         }
 
         // マスタ選択肢を読み込む
@@ -428,6 +429,7 @@
                 ['雇用区分', $('[name="employment_type"] option:selected').text()],
                 ['週勤務日数', d.weekly_work_days ? '週' + d.weekly_work_days + '勤務' : ''],
                 ['乗組員コード', d.crew_code],
+                ['新コード適用開始日', d.crew_code_valid_from],
             ];
             html += buildConfirmSection('所属・役職', org);
 
@@ -519,6 +521,14 @@
 
             const data = collectFormData();
             const id = $('#empId').val();
+            const oldCrewCode = existingData ? String(existingData.crew_code || '').trim() : '';
+            const newCrewCode = String(data.crew_code || '').trim();
+            if (oldCrewCode && oldCrewCode !== newCrewCode && !data.crew_code_valid_from) {
+                showToast('乗組員コードを変更・終了する場合は、新コード適用開始日を入力してください', 'error');
+                goStep(1);
+                $('[name="crew_code_valid_from"]').addClass('error').focus();
+                return;
+            }
 
             $('#empBtnSubmit').prop('disabled', true).text('保存中...');
             empAjax('emp_employee_save', { nonce: empData.employeeNonce, id: id, data: data }, function (res) {
@@ -610,6 +620,61 @@
                 });
             }
         }
+
+        function renderCrewCodeHistory(rows) {
+            const canManage = parseInt($('#emp-form-page').attr('data-can-manage-crew-history'), 10) === 1;
+            if (!rows.length) {
+                $('#crewCodeHistory').html('<div class="emp-crew-history-empty">履歴はまだありません</div>');
+                return;
+            }
+            const html = rows.map(function (row) {
+                const current = parseInt(row.is_current, 10) === 1;
+                return '<div class="emp-crew-history-row" data-history-id="' + escAttr(row.id) + '">' +
+                    '<input type="text" class="emp-input crew-history-code" value="' + escAttr(row.crew_code || '') + '" ' + (current || !canManage ? 'readonly' : '') + '>' +
+                    '<input type="date" class="emp-input crew-history-from" value="' + escAttr(row.valid_from || '') + '" aria-label="使用開始日" ' + (!canManage ? 'readonly' : '') + '>' +
+                    '<input type="date" class="emp-input crew-history-to" value="' + escAttr(row.valid_to || '') + '" aria-label="使用終了日" ' + (current || !canManage ? 'disabled' : '') + '>' +
+                    '<span class="emp-crew-history-status ' + (parseInt(row.is_current, 10) ? 'current' : '') + '">' +
+                    (current ? '現行' : '過去') + '</span>' +
+                    (canManage ? '<button type="button" class="emp-btn emp-btn-secondary crew-history-update">期間を保存</button>' : '<span></span>') + '</div>';
+            }).join('');
+            $('#crewCodeHistory').html(html);
+            $('#crewCodeHistoryWrap').show();
+        }
+
+        $('#crewHistoryAdd').on('click', function () {
+            const employeeId = parseInt($('#empId').val(), 10) || 0;
+            const $btn = $(this).prop('disabled', true);
+            empAjax('emp_crew_history_add', {
+                nonce: empData.employeeNonce,
+                employee_id: employeeId,
+                crew_code: $('#crewHistoryNewCode').val(),
+                valid_from: $('#crewHistoryNewFrom').val(),
+                valid_to: $('#crewHistoryNewTo').val(),
+            }, function (res) {
+                $btn.prop('disabled', false);
+                if (!res.success) { showToast(res.data.message, 'error'); return; }
+                showToast(res.data.message, 'success');
+                window.location.reload();
+            });
+        });
+
+        $('#crewCodeHistory').on('click', '.crew-history-update', function () {
+            const $row = $(this).closest('.emp-crew-history-row');
+            const $btn = $(this).prop('disabled', true);
+            empAjax('emp_crew_history_update', {
+                nonce: empData.employeeNonce,
+                history_id: $row.data('history-id'),
+                employee_id: parseInt($('#empId').val(), 10) || 0,
+                crew_code: $row.find('.crew-history-code').val(),
+                valid_from: $row.find('.crew-history-from').val(),
+                valid_to: $row.find('.crew-history-to').val(),
+            }, function (res) {
+                $btn.prop('disabled', false);
+                if (!res.success) { showToast(res.data.message, 'error'); return; }
+                showToast(res.data.message, 'success');
+                window.location.reload();
+            });
+        });
     }
 
     // =====================================================
