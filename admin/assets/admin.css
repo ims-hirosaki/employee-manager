@@ -1994,7 +1994,7 @@ a.emp-btn-success:hover {
 .emp-wrap .emp-crew-history-status.current { color: #16803b; font-weight: 700; }
 .emp-wrap .emp-crew-history-empty { padding: 12px; color: #777; background: #fff; }
 .emp-wrap .emp-crew-history-add { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.emp-wrap .emp-crew-history-add .emp-input { max-width: 190px; }
+.emp-wrap .emp-crew-history-add .emp-input { max-width: 260px; }
 
 @media (max-width: 1100px) {
   .emp-csv-layout {

@@ -3,7 +3,7 @@
  * Plugin Name: 社員情報管理システム
  * Plugin URI:  https://example.com/employee-manager
  * Description: 社員マスタ・所属・部署・役職・職種・学歴・職歴・資格・扶養者・保険情報を一元管理するプラグイン
- * Version:     1.2.0
+ * Version:     1.2.1
  * Author:      Your Name
  * License:     GPL-2.0+
  * Text Domain: employee-manager
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ===== 定数定義 =====
-define( 'EMP_VERSION',     '1.2.0' );
+define( 'EMP_VERSION',     '1.2.1' );
 define( 'EMP_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'EMP_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'EMP_PLUGIN_FILE', __FILE__ );

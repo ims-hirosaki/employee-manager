@@ -140,30 +140,26 @@ $page_title = $is_new ? '新規社員登録' : '社員情報編集：' . esc_htm
                             <option value="6">週6勤務</option>
                         </select>
                     </div>
+                    <?php if ( $is_new ) : ?>
                     <div class="emp-field emp-field-quarter">
-                        <label class="emp-label">現行乗組員コード</label>
+                        <label class="emp-label">初回乗組員コード</label>
                         <input type="text" name="crew_code" class="emp-input" placeholder="該当する場合のみ入力">
-                        <span class="emp-hint">乗組員でない場合は空欄のままにしてください</span>
+                        <span class="emp-hint">登録日を使用開始日として自動保存します</span>
                     </div>
-                    <div class="emp-field emp-field-quarter">
-                        <label class="emp-label">新コード適用開始日</label>
-                        <input type="date" name="crew_code_valid_from" class="emp-input">
-                        <span class="emp-hint">既存コードを変更・終了する場合は必須です</span>
-                    </div>
-                    <div class="emp-field emp-field-full" id="crewCodeHistoryWrap"<?php echo $is_new ? ' style="display:none;"' : ''; ?>>
+                    <?php else : ?>
+                    <div class="emp-field emp-field-full" id="crewCodeHistoryWrap">
                         <label class="emp-label">乗組員コード履歴</label>
                         <div class="emp-crew-history" id="crewCodeHistory"></div>
-                        <?php if ( ! $is_new && $can_manage_crew_history ) : ?>
                         <div class="emp-crew-history-add">
-                            <input type="text" id="crewHistoryNewCode" class="emp-input" placeholder="過去の乗組員コード">
-                            <input type="date" id="crewHistoryNewFrom" class="emp-input" aria-label="使用開始日">
-                            <span>～</span>
-                            <input type="date" id="crewHistoryNewTo" class="emp-input" aria-label="使用終了日">
-                            <button type="button" class="emp-btn emp-btn-secondary" id="crewHistoryAdd">過去コードを追加</button>
+                            <input type="text" id="crewHistoryNewCode" class="emp-input" placeholder="新しい乗組員コード">
+                            <button type="button" class="emp-btn emp-btn-secondary" id="crewHistoryAdd">新規コードを追加</button>
                         </div>
-                        <span class="emp-hint">期間不明は空欄にできます。現行履歴と重なる場合は、先に現行履歴の開始日を設定してください。</span>
+                        <span class="emp-hint">追加日を使用開始日として自動保存し、現行コードは前日までの履歴になります。</span>
+                        <?php if ( $can_manage_crew_history ) : ?>
+                        <span class="emp-hint">登録が遅れた場合は、履歴の日付を修正して「期間を保存」してください。</span>
                         <?php endif; ?>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

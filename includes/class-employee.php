@@ -347,8 +347,12 @@ class EMP_Employee {
                 (int) $id
             ) ) );
         }
-        $new_crew_code = trim( sanitize_text_field( $data['crew_code'] ?? '' ) );
-        $crew_valid_from = self::sanitize_date( $data['crew_code_valid_from'] ?? '' );
+        // 既存社員のコード変更は履歴欄の「新規コードを追加」からのみ行う。
+        // 新規社員の初回コードは登録日を使用開始日として自動保存する。
+        $new_crew_code = $id > 0
+            ? $old_crew_code
+            : trim( sanitize_text_field( $data['crew_code'] ?? '' ) );
+        $crew_valid_from = ( $id === 0 && $new_crew_code !== '' ) ? current_time( 'Y-m-d' ) : null;
 
         if ( $old_crew_code !== $new_crew_code ) {
             if ( $id > 0 && $old_crew_code !== '' && ! $crew_valid_from ) {
@@ -644,27 +648,76 @@ class EMP_Employee {
         return true;
     }
 
-    private static function add_crew_history( $employee_id, $crew_code, $valid_from, $valid_to ) {
+    /**
+     * 新しい現行コードを追加し、登録日を境に旧コードを履歴化する。
+     */
+    private static function add_current_crew_code( $employee_id, $crew_code ) {
         global $wpdb;
+        $employee_id = (int) $employee_id;
         $crew_code = trim( sanitize_text_field( $crew_code ) );
-        $valid_from = self::sanitize_date( $valid_from );
-        $valid_to = self::sanitize_date( $valid_to );
-        if ( $crew_code === '' ) return new WP_Error( 'validation', '乗組員コードは必須です' );
-        if ( ! $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}emp_master WHERE id = %d", $employee_id ) ) ) {
-            return new WP_Error( 'not_found', '社員が見つかりません' );
+        if ( ! $employee_id || $crew_code === '' ) {
+            return new WP_Error( 'validation', '新しい乗組員コードを入力してください' );
         }
-        $validation = self::validate_history_period( $employee_id, $crew_code, $valid_from, $valid_to );
-        if ( is_wp_error( $validation ) ) return $validation;
 
-        $now = current_time( 'mysql' );
-        $user_id = get_current_user_id() ?: null;
-        $result = $wpdb->insert( "{$wpdb->prefix}emp_crew_code_history", array(
-            'employee_id' => (int) $employee_id, 'crew_code' => $crew_code,
-            'valid_from' => $valid_from, 'valid_to' => $valid_to, 'is_current' => 0,
-            'created_by' => $user_id, 'updated_by' => $user_id,
-            'created_at' => $now, 'updated_at' => $now,
+        $old_code = $wpdb->get_var( $wpdb->prepare(
+            "SELECT crew_code FROM {$wpdb->prefix}emp_master WHERE id = %d",
+            $employee_id
         ) );
-        return $result === false ? new WP_Error( 'db_error', '履歴の追加に失敗しました' ) : true;
+        if ( $old_code === null ) return new WP_Error( 'not_found', '社員が見つかりません' );
+        $old_code = trim( (string) $old_code );
+        if ( $old_code === $crew_code ) {
+            return new WP_Error( 'same_crew_code', 'この乗組員コードはすでに現行コードです' );
+        }
+
+        $valid_from = current_time( 'Y-m-d' );
+        if ( $old_code !== '' ) {
+            $old_valid_from = $wpdb->get_var( $wpdb->prepare(
+                "SELECT valid_from FROM {$wpdb->prefix}emp_crew_code_history
+                 WHERE employee_id = %d AND crew_code = %s LIMIT 1",
+                $employee_id,
+                $old_code
+            ) );
+            if ( $old_valid_from && $valid_from <= $old_valid_from ) {
+                return new WP_Error( 'invalid_crew_date', '現行コードと同じ日には新しいコードを追加できません。履歴の日付を確認してください' );
+            }
+        }
+
+        $crew_error = self::validate_new_crew_code( $employee_id, $crew_code, $valid_from );
+        if ( is_wp_error( $crew_error ) ) return $crew_error;
+
+        $old_history_id = $old_code === '' ? 0 : (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}emp_crew_code_history
+             WHERE employee_id = %d AND crew_code = %s LIMIT 1",
+            $employee_id,
+            $old_code
+        ) );
+        $period_error = self::validate_history_period(
+            $employee_id,
+            $crew_code,
+            $valid_from,
+            null,
+            $old_history_id
+        );
+        if ( is_wp_error( $period_error ) ) return $period_error;
+
+        $wpdb->query( 'START TRANSACTION' );
+        $updated = $wpdb->update(
+            "{$wpdb->prefix}emp_master",
+            array( 'crew_code' => $crew_code, 'updated_at' => current_time( 'mysql' ) ),
+            array( 'id' => $employee_id )
+        );
+        if ( $updated === false ) {
+            $wpdb->query( 'ROLLBACK' );
+            return new WP_Error( 'db_error', '乗組員コードの更新に失敗しました' );
+        }
+
+        $history_result = self::sync_crew_code_history( $employee_id, $old_code, $crew_code, $valid_from );
+        if ( is_wp_error( $history_result ) ) {
+            $wpdb->query( 'ROLLBACK' );
+            return $history_result;
+        }
+        $wpdb->query( 'COMMIT' );
+        return $valid_from;
     }
 
     private static function update_crew_history( $history_id, $employee_id, $crew_code, $valid_from, $valid_to ) {
@@ -886,15 +939,13 @@ class EMP_Employee {
 
     public static function ajax_crew_history_add() {
         check_ajax_referer( 'emp_employee_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_custom_plugin_settings' ) ) wp_die( -1 );
-        $result = self::add_crew_history(
+        if ( ! current_user_can( 'edit_custom_plugins' ) ) wp_die( -1 );
+        $result = self::add_current_crew_code(
             absint( $_POST['employee_id'] ?? 0 ),
-            wp_unslash( $_POST['crew_code'] ?? '' ),
-            wp_unslash( $_POST['valid_from'] ?? '' ),
-            wp_unslash( $_POST['valid_to'] ?? '' )
+            wp_unslash( $_POST['crew_code'] ?? '' )
         );
         if ( is_wp_error( $result ) ) wp_send_json_error( array( 'message' => $result->get_error_message() ) );
-        wp_send_json_success( array( 'message' => '過去の乗組員コードを追加しました' ) );
+        wp_send_json_success( array( 'message' => '新しい乗組員コードを追加しました（使用開始日：' . $result . '）' ) );
     }
 
     public static function ajax_crew_history_update() {

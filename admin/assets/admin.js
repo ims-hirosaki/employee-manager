@@ -428,8 +428,7 @@
                 ['職種', $('#selJobType option:selected').text()],
                 ['雇用区分', $('[name="employment_type"] option:selected').text()],
                 ['週勤務日数', d.weekly_work_days ? '週' + d.weekly_work_days + '勤務' : ''],
-                ['乗組員コード', d.crew_code],
-                ['新コード適用開始日', d.crew_code_valid_from],
+                ['乗組員コード', d.crew_code || (existingData ? existingData.crew_code : '')],
             ];
             html += buildConfirmSection('所属・役職', org);
 
@@ -521,15 +520,6 @@
 
             const data = collectFormData();
             const id = $('#empId').val();
-            const oldCrewCode = existingData ? String(existingData.crew_code || '').trim() : '';
-            const newCrewCode = String(data.crew_code || '').trim();
-            if (oldCrewCode && oldCrewCode !== newCrewCode && !data.crew_code_valid_from) {
-                showToast('乗組員コードを変更・終了する場合は、新コード適用開始日を入力してください', 'error');
-                goStep(1);
-                $('[name="crew_code_valid_from"]').addClass('error').focus();
-                return;
-            }
-
             $('#empBtnSubmit').prop('disabled', true).text('保存中...');
             empAjax('emp_employee_save', { nonce: empData.employeeNonce, id: id, data: data }, function (res) {
                 $('#empBtnSubmit').prop('disabled', false).html('<span class="dashicons dashicons-yes"></span> ' + (id > 0 ? '更新する' : '登録する'));
@@ -643,13 +633,17 @@
 
         $('#crewHistoryAdd').on('click', function () {
             const employeeId = parseInt($('#empId').val(), 10) || 0;
+            const crewCode = String($('#crewHistoryNewCode').val() || '').trim();
+            if (!crewCode) {
+                showToast('新しい乗組員コードを入力してください', 'error');
+                $('#crewHistoryNewCode').focus();
+                return;
+            }
             const $btn = $(this).prop('disabled', true);
             empAjax('emp_crew_history_add', {
                 nonce: empData.employeeNonce,
                 employee_id: employeeId,
-                crew_code: $('#crewHistoryNewCode').val(),
-                valid_from: $('#crewHistoryNewFrom').val(),
-                valid_to: $('#crewHistoryNewTo').val(),
+                crew_code: crewCode,
             }, function (res) {
                 $btn.prop('disabled', false);
                 if (!res.success) { showToast(res.data.message, 'error'); return; }
