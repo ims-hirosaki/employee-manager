@@ -4,10 +4,12 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 $emp_id = isset( $_GET['id'] ) ? (int) $_GET['id'] : 0;
 $emp    = $emp_id > 0 ? EMP_Employee::get_by_id( $emp_id ) : null;
 $is_new = ! $emp;
+$can_manage_crew_history = current_user_can( 'manage_custom_plugin_settings' );
 $page_title = $is_new ? '新規社員登録' : '社員情報編集：' . esc_html( $emp->name );
 ?>
 <div class="wrap emp-wrap" id="emp-form-page"
      data-emp-id="<?php echo esc_attr( $emp_id ); ?>"
+     data-can-manage-crew-history="<?php echo $can_manage_crew_history ? '1' : '0'; ?>"
      data-emp-json="<?php echo $emp ? esc_attr( wp_json_encode( $emp ) ) : ''; ?>">
 
     <h1><?php echo esc_html( $page_title ); ?></h1>
@@ -138,11 +140,26 @@ $page_title = $is_new ? '新規社員登録' : '社員情報編集：' . esc_htm
                             <option value="6">週6勤務</option>
                         </select>
                     </div>
-                    <div class="emp-field emp-field-half">
-                        <label class="emp-label">乗組員コード</label>
+                    <?php if ( $is_new ) : ?>
+                    <div class="emp-field emp-field-quarter">
+                        <label class="emp-label">初回乗組員コード</label>
                         <input type="text" name="crew_code" class="emp-input" placeholder="該当する場合のみ入力">
-                        <span class="emp-hint">乗組員でない場合は空欄のままにしてください</span>
+                        <span class="emp-hint">登録日を使用開始日として自動保存します</span>
                     </div>
+                    <?php else : ?>
+                    <div class="emp-field emp-field-full" id="crewCodeHistoryWrap">
+                        <label class="emp-label">乗組員コード履歴</label>
+                        <div class="emp-crew-history" id="crewCodeHistory"></div>
+                        <div class="emp-crew-history-add">
+                            <input type="text" id="crewHistoryNewCode" class="emp-input" placeholder="新しい乗組員コード">
+                            <button type="button" class="emp-btn emp-btn-secondary" id="crewHistoryAdd">新規コードを追加</button>
+                        </div>
+                        <span class="emp-hint">追加日を使用開始日として自動保存し、現行コードは前日までの履歴になります。</span>
+                        <?php if ( $can_manage_crew_history ) : ?>
+                        <span class="emp-hint">登録が遅れた場合は、履歴の日付を修正して「期間を保存」してください。</span>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 

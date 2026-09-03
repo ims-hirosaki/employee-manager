@@ -143,6 +143,8 @@ class EMP_Admin_Menu {
         add_action( 'wp_ajax_emp_employee_get_one',     array( 'EMP_Employee', 'ajax_get_one' ) );
         add_action( 'wp_ajax_emp_employee_save',        array( 'EMP_Employee', 'ajax_save' ) );
         add_action( 'wp_ajax_emp_employee_toggle',      array( 'EMP_Employee', 'ajax_toggle_active' ) );
+        add_action( 'wp_ajax_emp_crew_history_add',     array( 'EMP_Employee', 'ajax_crew_history_add' ) );
+        add_action( 'wp_ajax_emp_crew_history_update',  array( 'EMP_Employee', 'ajax_crew_history_update' ) );
 
         // ---- CSV ----
         add_action( 'wp_ajax_emp_csv_export',           array( 'EMP_CSV_Export', 'ajax_export' ) );

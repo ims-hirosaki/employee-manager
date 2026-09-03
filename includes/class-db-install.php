@@ -15,6 +15,7 @@ class EMP_DB_Install {
      */
     public static function activate() {
         self::create_tables();
+        self::backfill_current_crew_codes();
         update_option( 'emp_db_version', EMP_VERSION );
     }
 
@@ -123,6 +124,27 @@ class EMP_DB_Install {
             KEY          idx_affiliation  (affiliation_id),
             KEY          idx_department   (department_id),
             KEY          idx_is_active    (is_active)
+        ) $charset;";
+
+        // =====================================================
+        // 乗務員コード履歴（社員1人に複数コード・適用期間）
+        // =====================================================
+        $sqls[] = "CREATE TABLE {$wpdb->prefix}emp_crew_code_history (
+            id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            employee_id     INT UNSIGNED    NOT NULL,
+            crew_code       VARCHAR(20)     NOT NULL,
+            valid_from      DATE                 NULL DEFAULT NULL,
+            valid_to        DATE                 NULL DEFAULT NULL,
+            is_current      TINYINT(1)      NOT NULL DEFAULT 0,
+            created_by      BIGINT UNSIGNED      NULL DEFAULT NULL,
+            updated_by      BIGINT UNSIGNED      NULL DEFAULT NULL,
+            created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_employee_code (employee_id, crew_code),
+            KEY idx_employee_period (employee_id, valid_from, valid_to),
+            KEY idx_code_period (crew_code, valid_from, valid_to),
+            KEY idx_current (employee_id, is_current)
         ) $charset;";
 
         // =====================================================
@@ -248,6 +270,41 @@ class EMP_DB_Install {
     }
 
     /**
+     * 既存社員の現行コードを履歴へ初期登録する（再実行可能）。
+     */
+    private static function backfill_current_crew_codes() {
+        global $wpdb;
+
+        $history = "{$wpdb->prefix}emp_crew_code_history";
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $history ) ) !== $history ) {
+            return;
+        }
+
+        $now = current_time( 'mysql' );
+        $wpdb->query(
+            $wpdb->prepare(
+                "INSERT INTO {$history}
+                    (employee_id, crew_code, valid_from, valid_to, is_current, created_at, updated_at)
+                 SELECT m.id, TRIM(m.crew_code), NULL, NULL, 1, %s, %s
+                 FROM {$wpdb->prefix}emp_master m
+                 LEFT JOIN {$history} h
+                   ON h.employee_id = m.id AND h.crew_code = TRIM(m.crew_code)
+                 WHERE m.crew_code IS NOT NULL AND TRIM(m.crew_code) <> '' AND h.id IS NULL",
+                $now,
+                $now
+            )
+        );
+
+        // master の現行値と一致する既存履歴は現行扱いに戻す。
+        $wpdb->query(
+            "UPDATE {$history} h
+             INNER JOIN {$wpdb->prefix}emp_master m ON m.id = h.employee_id
+             SET h.is_current = CASE WHEN h.crew_code = TRIM(m.crew_code) THEN 1 ELSE 0 END
+             WHERE m.crew_code IS NOT NULL AND TRIM(m.crew_code) <> ''"
+        );
+    }
+
+    /**
      * 全テーブルを削除する（uninstall.phpから呼ぶ）
      */
     public static function drop_tables() {
@@ -255,6 +312,7 @@ class EMP_DB_Install {
 
         $tables = array(
             "{$wpdb->prefix}emp_csv_template",
+            "{$wpdb->prefix}emp_crew_code_history",
             "{$wpdb->prefix}emp_dependent",
             "{$wpdb->prefix}emp_qualification",
             "{$wpdb->prefix}emp_career",

@@ -203,6 +203,31 @@ class EMP_CSV_Import {
                 "SELECT id FROM {$wpdb->prefix}emp_master WHERE employee_code=%s", $d['employee_code']
             ) );
             if ( $existing_id && $dup_mode === 'skip' ) { $skipped++; continue; }
+            if ( $existing_id ) {
+                $old_crew_code = trim( (string) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT crew_code FROM {$wpdb->prefix}emp_master WHERE id=%d",
+                    $existing_id
+                ) ) );
+                $csv_crew_code = trim( (string) $d['crew_code'] );
+                if ( $old_crew_code !== $csv_crew_code ) {
+                    $errors[] = $line.'行目：乗組員コードの変更には適用開始日が必要なため、社員編集画面から変更してください（その他の項目は更新）';
+                    $d['crew_code'] = $old_crew_code;
+                }
+            } elseif ( trim( (string) $d['crew_code'] ) !== '' ) {
+                $csv_crew_code = trim( (string) $d['crew_code'] );
+                $master_conflict = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM {$wpdb->prefix}emp_master WHERE crew_code=%s LIMIT 1",
+                    $csv_crew_code
+                ) );
+                $history_conflict = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM {$wpdb->prefix}emp_crew_code_history WHERE crew_code=%s LIMIT 1",
+                    $csv_crew_code
+                ) );
+                if ( $master_conflict || $history_conflict ) {
+                    $errors[] = $line.'行目：乗組員コード「'.esc_html($csv_crew_code).'」は別の社員または履歴で使用中のため空欄で登録しました';
+                    $d['crew_code'] = '';
+                }
+            }
 
             $emp = array(
                 'employee_code'      => sanitize_text_field( $d['employee_code'] ),
@@ -261,8 +286,13 @@ class EMP_CSV_Import {
             if ( ! empty( $d['retirement_date'] ) ) {
                 $ret = array('retirement_date'=>self::parse_date($d['retirement_date']),'updated_at'=>current_time('mysql'));
                 $ret_id = $wpdb->get_var( $wpdb->prepare("SELECT id FROM {$wpdb->prefix}emp_retirement WHERE employee_id=%d",$emp_id) );
-                if ($ret_id) { $wpdb->update($wpdb->prefix.'emp_retirement',$ret,array('employee_id'=>$emp_id)); }
-                else { $ret['employee_id']=$emp_id; $ret['created_at']=current_time('mysql'); $wpdb->insert($wpdb->prefix.'emp_retirement',$ret); }
+            if ($ret_id) { $wpdb->update($wpdb->prefix.'emp_retirement',$ret,array('employee_id'=>$emp_id)); }
+            else { $ret['employee_id']=$emp_id; $ret['created_at']=current_time('mysql'); $wpdb->insert($wpdb->prefix.'emp_retirement',$ret); }
+            }
+
+            $history_result = EMP_Employee::ensure_current_crew_code_history( $emp_id );
+            if ( is_wp_error( $history_result ) ) {
+                $errors[] = $line.'行目：乗組員コード履歴の補完に失敗しました（'.$history_result->get_error_message().'）';
             }
         }
         return compact('success','updated','skipped','errors');

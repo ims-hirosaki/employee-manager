@@ -3,7 +3,7 @@
  * Plugin Name: 社員情報管理システム
  * Plugin URI:  https://example.com/employee-manager
  * Description: 社員マスタ・所属・部署・役職・職種・学歴・職歴・資格・扶養者・保険情報を一元管理するプラグイン
- * Version:     1.0.0
+ * Version:     1.2.1
  * Author:      Your Name
  * License:     GPL-2.0+
  * Text Domain: employee-manager
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ===== 定数定義 =====
-define( 'EMP_VERSION',     '1.1.0' );
+define( 'EMP_VERSION',     '1.2.1' );
 define( 'EMP_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'EMP_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 define( 'EMP_PLUGIN_FILE', __FILE__ );
@@ -99,6 +99,20 @@ function emp_get_employee_by_id( $employee_id ) {
  */
 function emp_get_employee_by_code( $employee_code ) {
     return EMP_Employee::get_by_code( sanitize_text_field( $employee_code ) );
+}
+
+/**
+ * 社員の乗務員コード履歴を取得する。
+ */
+function emp_get_crew_code_history( $employee_id ) {
+    return EMP_Employee::get_crew_code_history( (int) $employee_id );
+}
+
+/**
+ * 指定期間に有効な乗務員コードを取得する。
+ */
+function emp_get_crew_codes_for_period( $employee_id, $start_date, $end_date ) {
+    return EMP_Employee::get_crew_codes_for_period( (int) $employee_id, $start_date, $end_date );
 }
 
 /**
