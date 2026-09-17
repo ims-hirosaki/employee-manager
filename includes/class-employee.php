@@ -659,12 +659,13 @@ class EMP_Employee {
             return new WP_Error( 'validation', '新しい乗組員コードを入力してください' );
         }
 
-        $old_code = $wpdb->get_var( $wpdb->prepare(
-            "SELECT crew_code FROM {$wpdb->prefix}emp_master WHERE id = %d",
+        $employee = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id, crew_code FROM {$wpdb->prefix}emp_master WHERE id = %d",
             $employee_id
         ) );
-        if ( $old_code === null ) return new WP_Error( 'not_found', '社員が見つかりません' );
-        $old_code = trim( (string) $old_code );
+        if ( ! $employee ) return new WP_Error( 'not_found', '社員が見つかりません' );
+        // コード未登録（NULL）の社員と、社員自体が存在しない場合を区別する。
+        $old_code = trim( (string) $employee->crew_code );
         if ( $old_code === $crew_code ) {
             return new WP_Error( 'same_crew_code', 'この乗組員コードはすでに現行コードです' );
         }
