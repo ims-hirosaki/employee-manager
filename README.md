@@ -13,6 +13,7 @@ WordPress で社員マスタ・保険・学歴・職歴・資格・扶養者情�
 | マスタ管理 | 所属・部署・役職・職種のCRUD・インライン編集 |
 | CSV出力 | 列選択・列順調整・テンプレート保存・文字コード/形式指定 |
 | 公開API | 在籍社員一覧・社員情報取得などを他プラグインに提供 |
+| REST API | Excel Power Query 向け従業員マスタAPI（`/wp-json/employee-manager/v1/employees`、詳細は `docs/spec/07_公開API・AJAX仕様.md` Part C） |
 
 ---
 
@@ -28,7 +29,8 @@ employee-manager/
 │   ├── class-db-install.php         # 全12テーブルの作成・削除
 │   ├── class-employee.php           # 社員CRUD・AJAX ハンドラー
 │   ├── class-master.php             # マスタCRUD・AJAX ハンドラー
-│   └── class-csv-export.php         # CSV出力ロジック・テンプレート管理
+│   ├── class-csv-export.php         # CSV出力ロジック・テンプレート管理
+│   └── class-rest-api.php           # REST API（Excel Power Query 向け）
 │
 └── admin/
     ├── class-admin-menu.php         # メニュー登録・アセット読込・AJAXフック
