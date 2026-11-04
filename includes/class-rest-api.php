@@ -13,7 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * 認証:
  *   WordPress 標準の「アプリケーションパスワード」による Basic 認証。
  *   （Excel: データ → Webから → 基本 → ユーザー名 / アプリケーションパスワード）
- *   閲覧権限 access_custom_plugins を持つユーザーのみ取得できる。
+ *
+ * 権限（社内ツール共通 API 発行ルールに準拠）:
+ *   - 共通ロール「API取得」（api_reader）に、本プラグイン専用ケイパビリティ
+ *     emp_export_data を追加する。ロールが無ければ作成し、あれば作り直さない。
+ *   - emp_export_data または access_custom_plugins のどちらかを持つユーザーが取得できる。
  *
  * 返却項目は外部公開用に限定する（個人情報・連絡先・保険等は含めない）。
  *   employee_code, name, category, job_type_name, affiliation_name
@@ -21,6 +25,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EMP_REST_API {
 
     const API_NAMESPACE = 'employee-manager/v1';
+
+    /** 社内ツール共通のAPI取得ロール（他プラグインと共有） */
+    const ROLE_API   = 'api_reader';
+    /** 本プラグイン専用のAPI取得ケイパビリティ */
+    const CAP_EXPORT = 'emp_export_data';
 
     /** 職種名 → category の既定対応。部分一致で判定し、該当なしは DEFAULT_CATEGORY。 */
     const CATEGORY_MAP = array(
@@ -30,6 +39,34 @@ class EMP_REST_API {
 
     public static function init() {
         add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
+        // FTPデプロイでは有効化フックが走らないため init で確認する。
+        add_action( 'init', array( __CLASS__, 'ensure_role' ) );
+    }
+
+    /**
+     * 「API取得」ロールを用意する。
+     * 他プラグインと共有するため、既に存在する場合は作り直さず、
+     * 本プラグイン用のケイパビリティだけを追加する。
+     */
+    public static function ensure_role() {
+        $role = get_role( self::ROLE_API );
+        if ( ! $role ) {
+            add_role( self::ROLE_API, 'API取得', array( 'read' => true ) );
+            $role = get_role( self::ROLE_API );
+        }
+        if ( $role && ! $role->has_cap( self::CAP_EXPORT ) ) {
+            $role->add_cap( self::CAP_EXPORT );
+        }
+    }
+
+    /**
+     * プラグイン削除時：共有ロールは残し、本プラグインのケイパビリティだけ外す。
+     */
+    public static function remove_capability() {
+        $role = get_role( self::ROLE_API );
+        if ( $role && $role->has_cap( self::CAP_EXPORT ) ) {
+            $role->remove_cap( self::CAP_EXPORT );
+        }
     }
 
     public static function register_routes() {
@@ -53,24 +90,18 @@ class EMP_REST_API {
     }
 
     /**
-     * 閲覧権限チェック。未ログイン時は 401、権限不足は 403 を返す。
+     * 権限チェック。emp_export_data または access_custom_plugins が必要。
+     * 未ログインは 401、権限不足は 403。
      */
     public static function can_read() {
-        if ( ! is_user_logged_in() ) {
-            return new WP_Error(
-                'emp_rest_unauthorized',
-                '認証が必要です。アプリケーションパスワードで Basic 認証してください。',
-                array( 'status' => 401 )
-            );
+        if ( current_user_can( self::CAP_EXPORT ) || current_user_can( 'access_custom_plugins' ) ) {
+            return true;
         }
-        if ( ! current_user_can( 'access_custom_plugins' ) ) {
-            return new WP_Error(
-                'emp_rest_forbidden',
-                'この API を利用する権限がありません。',
-                array( 'status' => 403 )
-            );
-        }
-        return true;
+        return new WP_Error(
+            'emp_forbidden',
+            '権限がありません。',
+            array( 'status' => is_user_logged_in() ? 403 : 401 )
+        );
     }
 
     /**

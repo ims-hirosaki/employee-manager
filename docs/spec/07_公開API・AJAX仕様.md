@@ -164,14 +164,32 @@ add_filter( 'emp_rest_category_map', function ( $map ) {
 } );
 ```
 
-## C-2. 認証
+## C-2. 認証・権限
 
-WordPress 標準の **アプリケーションパスワード**（Basic認証・HTTPS必須）。`access_custom_plugins` 権限を持つユーザーのみ取得可。未認証は 401、権限不足は 403。
+社内ツール共通の API 発行ルール（勤怠管理リポジトリ `docs/api-guidelines.md`）に準拠する。
 
-1. WordPress 管理画面 → ユーザー → プロフィール → 「アプリケーションパスワード」で新規発行（例: 名前 `Excel`）。
-2. Excel → データ → Webから → URL に `https://<サイト>/wp-json/employee-manager/v1/employees` を入力。
-3. 認証方法で「基本」を選び、ユーザー名と発行したアプリケーションパスワードを入力。
-4. Power Query エディターで「テーブルへの変換」→ 列を展開。
+| 項目 | 内容 |
+|---|---|
+| 認証方式 | WordPress の**アプリケーションパスワード**（Basic 認証・HTTPS 必須） |
+| 必要な権限 | `emp_export_data` **または** `access_custom_plugins`（どちらか一方でよい） |
+| ロール | 「**API取得**」（スラッグ `api_reader`）。勤怠管理など他ツールと共有 |
+| 未ログイン | 401（コード `emp_forbidden`） |
+| 権限不足 | 403（コード `emp_forbidden`） |
+
+- ロール「API取得」は `init` フック（`EMP_REST_API::ensure_role()`）で確認する。**無ければ作成**し、**既にあれば作り直さず**、ケイパビリティ `emp_export_data` だけを追加する（FTP デプロイでは有効化フックが走らないため）。
+- 同じ「API取得」ロールでも、プラグインごとにケイパビリティが分かれる（勤怠管理は `am_export_data`）。社員管理のデータを見せたくないユーザーには、ロールではなくケイパビリティ単位で調整する。
+- 「API取得」ロールは社員の登録・編集・管理画面の権限（`edit_custom_plugins` など）を持たない。
+- `access_custom_plugins` を持つ既存の管理画面利用者は、そのまま API を使える。
+- プラグイン削除時（`uninstall.php`）は、共有ロールは残し、`emp_export_data` だけを外す。
+
+### 利用手順
+
+1. Excel 担当者ごとに WordPress ユーザーを作り、ロール「API取得」を付ける（共有アカウントにしない）。
+2. そのユーザーのプロフィール画面で「アプリケーションパスワード」を発行して控える（発行直後の 1 回しか表示されない）。
+3. Excel → データ → Webから → URL に `https://<サイト>/wp-json/employee-manager/v1/employees` を入力。
+4. 認証方法で「基本」を選び、ユーザー名と発行したアプリケーションパスワードを入力。
+5. Power Query エディターで「テーブルへの変換」→ 列を展開。
+6. 退職・異動時は、そのユーザーのアプリケーションパスワードを失効する。
 
 Power Query (M) 例:
 
@@ -184,4 +202,10 @@ in
     Typed
 ```
 
-注意: Apache(CGI/FastCGI) 環境では `Authorization` ヘッダーが PHP に渡らず 401 になることがある。その場合は `.htaccess` に `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` を追加する。
+動作確認:
+
+```bash
+curl -u 'USER:APP_PASSWORD' 'https://ドメイン/wp-json/employee-manager/v1/employees'
+```
+
+注意: XSERVER などで `Authorization` ヘッダーが PHP に渡らず 401 になる場合は、`.htaccess` に `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]` を追記する。

@@ -13,6 +13,10 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 // クラスを読み込む
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-db-install.php';
 
+// 共有ロール「API取得」から本プラグインのケイパビリティだけ外す（ロール自体は他プラグインと共有のため残す）
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-rest-api.php';
+EMP_REST_API::remove_capability();
+
 // 全テーブルを削除
 EMP_DB_Install::drop_tables();
 
