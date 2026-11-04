@@ -25,6 +25,7 @@ require_once EMP_PLUGIN_DIR . 'includes/class-master.php';
 require_once EMP_PLUGIN_DIR . 'includes/class-employee.php';
 require_once EMP_PLUGIN_DIR . 'includes/class-csv-export.php';
 require_once EMP_PLUGIN_DIR . 'includes/class-csv-import.php';
+require_once EMP_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once EMP_PLUGIN_DIR . 'admin/class-admin-menu.php';
 
 // ===== 有効化フック =====
@@ -42,6 +43,9 @@ function emp_init() {
         EMP_DB_Install::activate();
     }
 }
+
+// ===== REST API（Excel Power Query 等向け）=====
+EMP_REST_API::init();
 
 // ===== 管理画面の初期化 =====
 if ( is_admin() ) {

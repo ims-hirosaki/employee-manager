@@ -114,3 +114,74 @@ $.post(empData.ajaxUrl, {
 2. `admin/class-admin-menu.php` の `register_ajax_hooks()` に `add_action( 'wp_ajax_emp_xxx', ... )` を追加。
 3. 必要なら nonce を `enqueue_assets()` の `wp_localize_script` に追加。
 4. `admin.js` の該当画面ブロック（`if ($('#emp-xxx-page').length) { ... }`）から `empAjax('emp_xxx', {...}, cb)` を呼ぶ。
+
+---
+
+# Part C. REST API（Excel Power Query 向け）
+
+定義元: `includes/class-rest-api.php`
+
+## C-1. 従業員マスタAPI
+
+```
+GET /wp-json/employee-manager/v1/employees
+```
+
+| パラメータ | 値 | 既定 | 説明 |
+|---|---|---|---|
+| `status` | `active` / `retired` / `all` | `active` | 在籍区分で絞り込み |
+
+レスポンス（JSON配列。社員コードの数値順）:
+
+```json
+[
+  {
+    "employee_code": "101",
+    "name": "山田 太郎",
+    "category": "chokyo",
+    "job_type_name": "長距離",
+    "affiliation_name": "本社"
+  }
+]
+```
+
+| 項目 | 出典 | 備考 |
+|---|---|---|
+| `employee_code` | `emp_master.employee_code` | 常に文字列（先頭0を保持） |
+| `name` | `emp_master.name` | |
+| `category` | 職種名から算出 | 職種名に「長距離」を含む → `chokyo`、それ以外（未設定含む） → `jiba` |
+| `job_type_name` | `mst_job_type.name` | 未設定は空文字 |
+| `affiliation_name` | `mst_affiliation.name` | 未設定は空文字 |
+
+上記以外（個人番号・住所・電話・保険等）は返さない。
+
+`category` の対応はフィルターで変更できる:
+
+```php
+add_filter( 'emp_rest_category_map', function ( $map ) {
+    $map['中距離'] = 'chukyo';   // 職種名に含まれる文字列 => category
+    return $map;
+} );
+```
+
+## C-2. 認証
+
+WordPress 標準の **アプリケーションパスワード**（Basic認証・HTTPS必須）。`access_custom_plugins` 権限を持つユーザーのみ取得可。未認証は 401、権限不足は 403。
+
+1. WordPress 管理画面 → ユーザー → プロフィール → 「アプリケーションパスワード」で新規発行（例: 名前 `Excel`）。
+2. Excel → データ → Webから → URL に `https://<サイト>/wp-json/employee-manager/v1/employees` を入力。
+3. 認証方法で「基本」を選び、ユーザー名と発行したアプリケーションパスワードを入力。
+4. Power Query エディターで「テーブルへの変換」→ 列を展開。
+
+Power Query (M) 例:
+
+```m
+let
+    Source = Json.Document(Web.Contents("https://example.com/wp-json/employee-manager/v1/employees", [Query = [status = "active"]])),
+    Table  = Table.FromRecords(Source, {"employee_code", "name", "category", "job_type_name", "affiliation_name"}, MissingField.UseNull),
+    Typed  = Table.TransformColumnTypes(Table, {{"employee_code", type text}, {"name", type text}, {"category", type text}, {"job_type_name", type text}, {"affiliation_name", type text}})
+in
+    Typed
+```
+
+注意: Apache(CGI/FastCGI) 環境では `Authorization` ヘッダーが PHP に渡らず 401 になることがある。その場合は `.htaccess` に `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` を追加する。
