@@ -15,6 +15,7 @@ class EMP_DB_Install {
      */
     public static function activate() {
         self::create_tables();
+        self::migrate_crew_code_history_index();
         self::backfill_current_crew_codes();
         update_option( 'emp_db_version', EMP_VERSION );
     }
@@ -141,7 +142,7 @@ class EMP_DB_Install {
             created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY uq_employee_code (employee_id, crew_code),
+            KEY idx_employee_code (employee_id, crew_code),
             KEY idx_employee_period (employee_id, valid_from, valid_to),
             KEY idx_code_period (crew_code, valid_from, valid_to),
             KEY idx_current (employee_id, is_current)
@@ -270,6 +271,29 @@ class EMP_DB_Install {
     }
 
     /**
+     * 同一社員が過去のコードへ戻れるよう、旧 UNIQUE(employee_id, crew_code) を通常インデックスへ置き換える。
+     * dbDelta は既存インデックスを削除しないため、ここで明示的に変更する（再実行可能）。
+     */
+    private static function migrate_crew_code_history_index() {
+        global $wpdb;
+
+        $history = "{$wpdb->prefix}emp_crew_code_history";
+        if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $history ) ) !== $history ) {
+            return;
+        }
+
+        $has_unique = $wpdb->get_var( "SHOW INDEX FROM `{$history}` WHERE Key_name = 'uq_employee_code'" );
+        $has_index  = $wpdb->get_var( "SHOW INDEX FROM `{$history}` WHERE Key_name = 'idx_employee_code'" );
+
+        if ( ! $has_index ) {
+            $wpdb->query( "ALTER TABLE `{$history}` ADD INDEX `idx_employee_code` (`employee_id`, `crew_code`)" );
+        }
+        if ( $has_unique ) {
+            $wpdb->query( "ALTER TABLE `{$history}` DROP INDEX `uq_employee_code`" );
+        }
+    }
+
+    /**
      * 既存社員の現行コードを履歴へ初期登録する（再実行可能）。
      */
     private static function backfill_current_crew_codes() {
@@ -295,11 +319,12 @@ class EMP_DB_Install {
             )
         );
 
-        // master の現行値と一致する既存履歴は現行扱いに戻す。
+        // master の現行値と一致し、終了日が無い履歴だけを現行扱いにする。
+        // 同じコードを再利用した社員では、終了済みの過去行は現行に戻さない。
         $wpdb->query(
             "UPDATE {$history} h
              INNER JOIN {$wpdb->prefix}emp_master m ON m.id = h.employee_id
-             SET h.is_current = CASE WHEN h.crew_code = TRIM(m.crew_code) THEN 1 ELSE 0 END
+             SET h.is_current = CASE WHEN h.crew_code = TRIM(m.crew_code) AND h.valid_to IS NULL THEN 1 ELSE 0 END
              WHERE m.crew_code IS NOT NULL AND TRIM(m.crew_code) <> ''"
         );
     }

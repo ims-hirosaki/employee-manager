@@ -359,12 +359,8 @@ class EMP_Employee {
                 return new WP_Error( 'crew_date_required', '乗組員コードを変更・終了する場合は、新コードの適用開始日を入力してください' );
             }
             if ( $old_crew_code !== '' && $crew_valid_from ) {
-                $old_valid_from = $wpdb->get_var( $wpdb->prepare(
-                    "SELECT valid_from FROM {$wpdb->prefix}emp_crew_code_history
-                     WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-                    (int) $id,
-                    $old_crew_code
-                ) );
+                $old_row = self::find_history_row( (int) $id, $old_crew_code );
+                $old_valid_from = $old_row ? $old_row['valid_from'] : null;
                 if ( $old_valid_from && $crew_valid_from <= $old_valid_from ) {
                     return new WP_Error( 'invalid_crew_date', '新コードの適用開始日は、現行コードの使用開始日より後にしてください' );
                 }
@@ -372,12 +368,8 @@ class EMP_Employee {
             $crew_error = self::validate_new_crew_code( (int) $id, $new_crew_code, $crew_valid_from );
             if ( is_wp_error( $crew_error ) ) return $crew_error;
             if ( $new_crew_code !== '' ) {
-                $old_history_id = $old_crew_code === '' ? 0 : (int) $wpdb->get_var( $wpdb->prepare(
-                    "SELECT id FROM {$wpdb->prefix}emp_crew_code_history
-                     WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-                    (int) $id,
-                    $old_crew_code
-                ) );
+                $old_row = $old_crew_code === '' ? null : self::find_history_row( (int) $id, $old_crew_code );
+                $old_history_id = $old_row ? (int) $old_row['id'] : 0;
                 $period_error = self::validate_history_period(
                     (int) $id,
                     $new_crew_code,
@@ -490,14 +482,8 @@ class EMP_Employee {
             return new WP_Error( 'missing_history_table', '乗組員コード履歴テーブルが未作成です。プラグインを再有効化してください' );
         }
 
-        $same_employee = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM {$table} WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-            $employee_id,
-            $crew_code
-        ) );
-        if ( $same_employee ) {
-            return new WP_Error( 'crew_code_reuse', 'この乗組員コードは当該社員の過去履歴に存在します。再利用する場合は履歴期間の管理機能で調整してください' );
-        }
+        // 同じ社員が過去に使ったコードへ戻すことは許可する。
+        // 自分の他の履歴との期間重複は validate_history_period() で検証する。
 
         if ( $valid_from ) {
             $conflict = $wpdb->get_var( $wpdb->prepare(
@@ -522,6 +508,23 @@ class EMP_Employee {
     }
 
     /**
+     * 社員×コードの履歴行のうち、現行（無ければ終了日なし→開始日が新しい順）の1行を返す。
+     * 同じコードを再利用した社員は同じコードの行を複数持つため、LIMIT 1 だけで選ばない。
+     */
+    private static function find_history_row( $employee_id, $crew_code ) {
+        global $wpdb;
+        return $wpdb->get_row( $wpdb->prepare(
+            "SELECT id, valid_from, valid_to, is_current FROM {$wpdb->prefix}emp_crew_code_history
+             WHERE employee_id = %d AND crew_code = %s
+             ORDER BY is_current DESC, (valid_to IS NULL) DESC,
+                      COALESCE(valid_from, '1000-01-01') DESC, id DESC
+             LIMIT 1",
+            (int) $employee_id,
+            $crew_code
+        ), ARRAY_A );
+    }
+
+    /**
      * master の現行コード変更と履歴の終了・追加を同期する。
      */
     private static function sync_crew_code_history( $employee_id, $old_code, $new_code, $valid_from ) {
@@ -532,15 +535,12 @@ class EMP_Employee {
 
         if ( $old_code === $new_code ) {
             if ( $new_code === '' ) return true;
+            $existing_row = self::find_history_row( $employee_id, $new_code );
+            $existing = $existing_row ? (int) $existing_row['id'] : 0;
             $wpdb->query( $wpdb->prepare(
                 "UPDATE {$table} SET is_current = 0, updated_by = %d, updated_at = %s
-                 WHERE employee_id = %d AND crew_code <> %s AND is_current = 1",
-                (int) $user_id, $now, $employee_id, $new_code
-            ) );
-            $existing = $wpdb->get_var( $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-                $employee_id,
-                $new_code
+                 WHERE employee_id = %d AND id <> %d AND is_current = 1",
+                (int) $user_id, $now, $employee_id, $existing
             ) );
             if ( $existing ) {
                 $update = array( 'is_current' => 1, 'valid_to' => null, 'updated_by' => $user_id, 'updated_at' => $now );
@@ -560,6 +560,9 @@ class EMP_Employee {
             return $result === false ? new WP_Error( 'crew_history_error', '乗組員コード履歴の保存に失敗しました' ) : true;
         }
 
+        // 現行フラグを外す前に、終了させる旧コードの行（現行行）を特定しておく。
+        $old_row = $old_code !== '' ? self::find_history_row( $employee_id, $old_code ) : null;
+
         $wpdb->update( $table,
             array( 'is_current' => 0, 'updated_by' => $user_id, 'updated_at' => $now ),
             array( 'employee_id' => $employee_id )
@@ -567,11 +570,7 @@ class EMP_Employee {
 
         if ( $old_code !== '' ) {
             $valid_to = date( 'Y-m-d', strtotime( $valid_from . ' -1 day' ) );
-            $old_id = $wpdb->get_var( $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-                $employee_id,
-                $old_code
-            ) );
+            $old_id = $old_row ? (int) $old_row['id'] : 0;
             if ( $old_id ) {
                 $result = $wpdb->update( $table,
                     array( 'valid_to' => $valid_to, 'is_current' => 0, 'updated_by' => $user_id, 'updated_at' => $now ),
@@ -610,11 +609,7 @@ class EMP_Employee {
             (int) $employee_id
         ) ) );
         if ( $code === '' ) return true;
-        $exists = $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}emp_crew_code_history WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-            (int) $employee_id,
-            $code
-        ) );
+        $exists = self::find_history_row( (int) $employee_id, $code );
         if ( ! $exists ) {
             $validation = self::validate_new_crew_code( (int) $employee_id, $code, null );
             if ( is_wp_error( $validation ) ) return $validation;
@@ -671,13 +666,9 @@ class EMP_Employee {
         }
 
         $valid_from = current_time( 'Y-m-d' );
+        $old_row = $old_code !== '' ? self::find_history_row( $employee_id, $old_code ) : null;
         if ( $old_code !== '' ) {
-            $old_valid_from = $wpdb->get_var( $wpdb->prepare(
-                "SELECT valid_from FROM {$wpdb->prefix}emp_crew_code_history
-                 WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-                $employee_id,
-                $old_code
-            ) );
+            $old_valid_from = $old_row ? $old_row['valid_from'] : null;
             if ( $old_valid_from && $valid_from <= $old_valid_from ) {
                 return new WP_Error( 'invalid_crew_date', '現行コードと同じ日には新しいコードを追加できません。履歴の日付を確認してください' );
             }
@@ -686,12 +677,7 @@ class EMP_Employee {
         $crew_error = self::validate_new_crew_code( $employee_id, $crew_code, $valid_from );
         if ( is_wp_error( $crew_error ) ) return $crew_error;
 
-        $old_history_id = $old_code === '' ? 0 : (int) $wpdb->get_var( $wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}emp_crew_code_history
-             WHERE employee_id = %d AND crew_code = %s LIMIT 1",
-            $employee_id,
-            $old_code
-        ) );
+        $old_history_id = $old_row ? (int) $old_row['id'] : 0;
         $period_error = self::validate_history_period(
             $employee_id,
             $crew_code,

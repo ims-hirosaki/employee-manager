@@ -1,7 +1,7 @@
 # 00 INDEX・AI向け利用ガイド（社員情報管理システム 仕様書セット）
 
 - 対象システム: WordPressプラグイン「社員情報管理システム」（slug: `employee-manager`）
-- 対象バージョン: **1.2.1**（`employee-manager.php` のヘッダ／`EMP_VERSION` 定数）
+- 対象バージョン: **1.2.2**（`employee-manager.php` のヘッダ／`EMP_VERSION` 定数）
 - 作成方法: ソースコードのリバースエンジニアリング（2026-10-08 時点の `claude/charming-goodall-kb9wcx` ブランチ）
 - 想定読者: 利用者（人事・総務担当）／システム管理者／保守エンジニア
 - 想定用途: NotebookLM・Gem のソース。利用者向けの操作質問にも、エンジニア向けの実装質問にも答えられるようにしてある。
